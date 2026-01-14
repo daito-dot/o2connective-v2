@@ -1,0 +1,196 @@
+// 適性診断サービス Prisma Schema
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 組織
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("basic") // basic, pro, enterprise
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  teams     Team[]
+}
+
+// ユーザー
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  department     String?
+  position       String?
+  role           String   @default("member") // member, manager, admin
+  organizationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization        Organization?          @relation(fields: [organizationId], references: [id])
+  personalitySessions PersonalitySession[]
+  cognitiveSessions   CognitiveSession[]
+  teamMemberships     TeamMember[]
+}
+
+// チーム
+model Team {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  members      TeamMember[]
+}
+
+// チームメンバーシップ
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      String   @default("member") // member, lead
+  joinedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, teamId])
+}
+
+// 性格診断セッション
+model PersonalitySession {
+  id          String    @id @default(cuid())
+  userId      String
+  status      String    @default("in_progress") // in_progress, completed, abandoned
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  user    User                 @relation(fields: [userId], references: [id])
+  answers PersonalityAnswer[]
+  result  PersonalityResult?
+}
+
+// 性格診断回答
+model PersonalityAnswer {
+  id             String   @id @default(cuid())
+  sessionId      String
+  questionId     String   // 設問ID (e.g., "EX-1", "CO-5")
+  value          Int      // 1-5
+  responseTimeMs Int?     // 回答時間（ミリ秒）
+  answeredAt     DateTime @default(now())
+
+  session PersonalitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// 性格診断結果
+model PersonalityResult {
+  id               String   @id @default(cuid())
+  sessionId        String   @unique
+
+  // ドメインスコア（JSON）
+  domainScores     Json     // { EX: {...}, CO: {...}, ... }
+
+  // 正規化スコア（JSON）
+  normalizedScores Json     // T-score, percentile, tendency levels
+
+  // 信頼性メトリクス（JSON）
+  reliabilityMetrics Json   // LI score, response patterns
+
+  // 使用した規準集団
+  normGroupId      String?
+
+  createdAt        DateTime @default(now())
+
+  session PersonalitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// 認知テストセッション
+model CognitiveSession {
+  id          String    @id @default(cuid())
+  userId      String
+  testType    String    @default("standard") // standard (ICAR-16), adaptive
+  status      String    @default("in_progress")
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  user    User              @relation(fields: [userId], references: [id])
+  answers CognitiveAnswer[]
+  result  CognitiveResult?
+}
+
+// 認知テスト回答
+model CognitiveAnswer {
+  id             String   @id @default(cuid())
+  sessionId      String
+  itemId         String   // アイテムID
+  itemType       String   // matrix_reasoning, letter_series, verbal, rotation_3d
+  selectedAnswer String?
+  isCorrect      Boolean?
+  responseTimeMs Int?
+  answeredAt     DateTime @default(now())
+
+  session CognitiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// 認知テスト結果
+model CognitiveResult {
+  id               String   @id @default(cuid())
+  sessionId        String   @unique
+
+  // 生スコア（JSON）
+  rawScores        Json     // { matrix: 3, letter: 4, verbal: 3, rotation: 2, total: 12 }
+
+  // 正規化スコア（JSON）
+  normalizedScores Json     // percentile, standardScore, relativePosition
+
+  // 時間データ（JSON）
+  timingData       Json?    // averageTime, timeByType
+
+  createdAt        DateTime @default(now())
+
+  session CognitiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// AI解釈キャッシュ
+model AIInterpretation {
+  id               String    @id @default(cuid())
+  userId           String
+  interpretationType String   // individual, team, one_on_one, manager_report
+  context          Json?     // 追加コンテキスト
+  interpretation   Json      // AI出力
+  modelUsed        String    // claude-3-opus, gpt-4, etc.
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime?
+
+  @@index([userId, interpretationType])
+}
+
+// 設問マスター（オプション：DBで管理する場合）
+model Question {
+  id           String  @id @default(cuid())
+  externalId   String  @unique // "EX-1", "CO-5", etc.
+  text         String
+  textEn       String?
+  category     String  // bigfive, darktriad, empathy, work, reliability
+  domain       String  // EX, CO, AG, NE, OP, MA, NA, PS, EM, WR, LI
+  keyed        String  // plus, minus (逆転項目)
+  order        Int
+  isActive     Boolean @default(true)
+
+  @@index([domain])
+  @@index([category])
+}

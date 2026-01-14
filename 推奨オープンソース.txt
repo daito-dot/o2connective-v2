@@ -1,0 +1,213 @@
+2. Big Five（ビッグ5）関連
+rubynor/bigfive-web
+URL：
+https://github.com/rubynor/bigfive-web
+​
+
+用途：Big Five Web テストのフロントエンド＋バックエンド一式
+
+技術：TypeScript/Next.js、マイクロサービス構成
+​
+
+ライセンス：MIT（商用利用・クローズドソース可）
+​
+
+コメント：Big Five 部分の UI/UX とアーキテクチャの「そのまま使える」本命候補。
+
+@bigfive-org/questions（npm パッケージ）
+URL：https://www.npmjs.com/package/@bigfive-org/questions
+​
+
+用途：IPIP-NEO-120 の質問項目（多言語 JSON データ）
+
+ライセンス：MIT（＋ IPIP 自体は public-domain）
+​
+
+コメント：Node/TS バックエンドで Big Five を実装する際の質問データソースとして最適。
+
+NerdiOrg/Python-IPIP-BFFM
+URL：
+https://github.com/NerdiOrg/Python-IPIP-BFFM
+​
+
+用途：IPIP-BFFM（50 項目 Big Five）のスコアリング実装（Python）
+
+ライセンス：GPL-3.0
+​
+
+コメント：ロジック参考用として優秀（コードを丸ごと組み込むのではなく、計算方法の参考に）。
+
+kholia/IPIP-NEO-PI
+URL：
+https://github.com/kholia/IPIP-NEO-PI
+​
+
+用途：IPIP-NEO-120/300 のオフラインテスト実装（Python）
+
+コメント：IPIP-NEO のスコアリング仕様やデータ構造の参考に。
+
+henriquepgomide/personality-big-five-ipip100
+URL：
+https://github.com/henriquepgomide/personality-big-five-ipip100
+​
+
+用途：IPIP100（100 項目版 Big Five）の Web 実装（Vue.js）
+
+コメント：Vue ベースのフロントアーキテクチャの参考に。
+
+3. 知能指数（ICAR）・認知テスト関連
+ICAR（International Cognitive Ability Resource）
+URL：
+https://icar-project.com
+ / 
+https://icar-project.org
+​
+
+用途：行列推理・文字数列・回転など、多領域の open な知能テスト項目プール
+
+ライセンス：public-domain を明示（ただし公式は学術利用を主に想定）
+​
+
+コメント：IQ/知能尺度の「中身（アイテム）」として中核候補。
+
+frenchja/icar（R 用ツール群）
+URL：
+https://github.com/frenchja/icar
+​
+
+用途：ICAR データのスコアリング・因子分析・IRT 解析（R）
+
+ライセンス：GPL (>=2)
+​
+
+コメント：ICAR 項目をどう集約して g や下位因子を出すかの実装例。
+
+psych / psychTools（R パッケージ）
+URL：https://cran.r-project.org/web/packages/psychTools
+​
+
+用途：ICAR16 などを含む心理尺度データ＋因子分析・IRT の実装
+​
+
+コメント：ICAR＋Big Five をまとめて扱うときの統計処理リファレンス。
+
+PEBL Test Battery
+URL（解説論文）：
+https://pmc.ncbi.nlm.nih.gov/articles/PMC3897935/
+​
+
+用途：ワーキングメモリ／注意／実行機能／処理速度など、多数の認知課題バッテリー
+
+ライセンス：PEBL は GPL-2.0
+​
+
+コメント：ICAR 以外の認知機能（注意・実行機能など）を足したいときの課題パラダイムのリファレンス。
+
+4. ダークトライアド（Dark Triad）関連
+zhu-minjun/PAlign
+URL：
+https://github.com/zhu-minjun/PAlign
+​
+
+用途：IPIP-NEO + Dark Triad（27 項目）の大規模データ＆スコアリング（LLM 用だが汎用的）
+
+ライセンス：MIT / BSD（＋ IPIP 系アイテムは public-domain）
+​
+
+コメント：
+
+Dark Triad のアイテムセットとスコアリングロジックを実装する際の最有力候補。
+
+Big Five と Dark Triad を同一基盤で扱う構成の参考にもなる。
+
+Open Source Psychometrics – Dark Triad Personality Test（SD-3）
+URL：
+https://openpsychometrics.org/tests/SD3/
+​
+
+用途：Short Dark Triad（SD-3）27 項目のオンラインテスト
+
+注意：educational use only と明記されており、商用転用は避けるのが安全
+​
+
+コメント：項目内容・因子構造の「設計参考」として。
+
+5. 職業・適性（キャリア適性診断）関連
+O*NET ベース解析ツール群
+dan-grant-hunter/ONET_Analysis_Classification
+URL：
+https://github.com/dan-grant-hunter/ONET_Analysis_Classification
+​
+
+用途：O*NET の職務データを分析・分類する Python ツール
+
+コメント：能力・興味・タスク内容から職業分類するロジックの参考。
+
+ONET-Analytical-Nature-Prediction-and-Classification-of-occupations
+URL：
+https://akshay-a-kulkarni.github.io/ONET-Analytical-Nature-Prediction-and-Classification-of-occupations/
+​
+
+用途：O*NET 特徴量から職務の「分析性」「創造性」などを予測するモデル
+​
+
+コメント：Big Five＋ICAR＋Dark Triad スコアを、O*NET 職務特性と接続する際のヒント。
+
+※O*NET 自体は米労働局の public-domain データベース で、職務適性マッピングの基盤として利用可能。
+​
+
+Aptitude / Career Web アプリ実装例
+ofagbure/Aptitude-Test
+URL：
+https://github.com/ofagbure/Aptitude-Test
+​
+
+用途：React + Express + MongoDB による適性テスト／採用向けクイズプラットフォーム
+
+ライセンス：MIT
+​
+
+コメント： Web アプリとしてのフロー（受検 → 採点 → 結果表示）の骨格参考。
+
+aryanmahawar205/AspiraMap
+URL：
+https://github.com/aryanmahawar205/AspiraMap
+​
+
+用途：AI ベースのキャリアガイダンス・プラットフォーム
+
+コメント：キャリアナビゲーション UI・機能構成のアイデアソース。
+
+6. あなたの構想との対応関係
+あなたの目的に直結するのは、ざっくり次のセットです：
+
+性格
+
+Big Five：rubynor/bigfive-web + @bigfive-org/questions
+​
+
+Dark Triad：zhu-minjun/PAlign（アイテム & スコアリング参考）
+​
+
+知能
+
+ICAR：公式サイトのアイテム（public-domain）
+​
+
+スコアリング：frenchja/icar / psychTools のロジック参考
+​
+
+配信基盤
+
+シンプル構成：自作フロント＋自作バック
+
+高度な適応型：Concerto Platform
+​
+
+適性（職業マッチング）
+
+データ：O*NET（public-domain）
+​
+
+分析ロジック：ONET_Analysis_Classification など
+​

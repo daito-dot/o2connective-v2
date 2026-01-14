@@ -1,0 +1,446 @@
+/**
+ * 適性検査スコア集計 Google Apps Script (v5.1)
+ * 
+ * 【変更点 v5.1】
+ * - 列名変更に対応: 貴社名→会社名, お名前→氏名
+ * 
+ * 【前提条件】
+ * - スプレッドシートに「設問」シートが存在すること
+ * - 「設問」シートの形式: ID, 設問文, 分析カテゴリ, 逆転項目
+ */
+
+const CATEGORY_NAMES = {
+  'EX': '外向性',
+  'CO': '誠実性',
+  'AG': '協調性',
+  'NE': '情緒安定性',
+  'OP': '開放性',
+  'MA': 'マキャベリズム',
+  'NA': 'ナルシシズム',
+  'PS': 'サイコパシー',
+  'EM': '共感性',
+  'WR': '仕事への姿勢',
+  'LI': '回答信頼性'
+};
+
+const SCORE_MAP = {
+  '強くあてはまらない': 1,
+  'あてはまらない': 2,
+  'どちらともいえない': 3,
+  'あてはまる': 4,
+  '強くあてはまる': 5
+};
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('適性検査')
+    .addItem('スコア集計実行', 'executeScoreCalculation')
+    .addToUi();
+}
+
+function executeScoreCalculation() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const masterSheet = ss.getSheetByName('設問');
+    if (!masterSheet) {
+      ui.alert('エラー', '「設問」シートが見つかりません。', ui.ButtonSet.OK);
+      return;
+    }
+    
+    const responseSheetName = selectResponseSheet();
+    if (!responseSheetName) return;
+    
+    const responseSheet = ss.getSheetByName(responseSheetName);
+    const questionMap = loadQuestionMaster(masterSheet);
+    const allResponses = loadResponseData(responseSheet);
+    
+    const filterSettings = selectFilterSettings(allResponses);
+    if (!filterSettings) return;
+    
+    const filteredResponses = filterResponses(allResponses, filterSettings);
+    
+    if (filteredResponses.length === 0) {
+      ui.alert('エラー', '選択された条件に該当するデータがありません。', ui.ButtonSet.OK);
+      return;
+    }
+    
+    const results = calculateScores(filteredResponses, questionMap);
+    outputResults(ss, results);
+    
+    ui.alert('完了', `スコア集計が完了しました!\n対象: ${results.length}名`, ui.ButtonSet.OK);
+    
+  } catch (error) {
+    ui.alert('エラー', 'エラーが発生しました: ' + error.message, ui.ButtonSet.OK);
+    Logger.log('Error: ' + error.stack);
+  }
+}
+
+function selectResponseSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  const ui = SpreadsheetApp.getUi();
+  
+  const sheetNames = sheets
+    .map(sheet => sheet.getName())
+    .filter(name => name !== '設問' && name !== '集計結果');
+  
+  if (sheetNames.length === 0) {
+    ui.alert('エラー', '回答シートが見つかりません。', ui.ButtonSet.OK);
+    return null;
+  }
+  
+  if (sheetNames.length === 1) {
+    return sheetNames[0];
+  }
+  
+  const response = ui.prompt(
+    '回答シートの選択',
+    '回答シート名を入力してください:\n\n利用可能なシート:\n' + sheetNames.join('\n'),
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const selectedName = response.getResponseText();
+    if (sheetNames.includes(selectedName)) {
+      return selectedName;
+    } else {
+      ui.alert('エラー', '指定されたシート名が見つかりません。', ui.ButtonSet.OK);
+      return null;
+    }
+  }
+  
+  return null;
+}
+
+function selectFilterSettings(responses) {
+  const ui = SpreadsheetApp.getUi();
+  
+  const companies = [...new Set(responses.map(r => r.company).filter(c => c))].sort();
+  const departments = [...new Set(responses.map(r => r.department).filter(d => d))].sort();
+  
+  const step1 = ui.alert(
+    'データ選択',
+    'すべてのデータを集計しますか?\n\n「いいえ」を選択すると、会社名・部署名でフィルタリングできます。',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (step1 === ui.Button.YES) {
+    return { filterType: 'all' };
+  }
+  
+  let selectedCompanies = [];
+  if (companies.length > 0) {
+    let companyList = '利用可能な会社名:\n';
+    companies.forEach((company, index) => {
+      companyList += `${index + 1}. ${company}\n`;
+    });
+    
+    const companyResponse = ui.prompt(
+      '会社名の選択',
+      companyList + '\n選択する会社の番号をカンマ区切りで入力してください。\n(例: 1,3,5)\n空欄の場合はすべての会社が対象になります。',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (companyResponse.getSelectedButton() === ui.Button.CANCEL) {
+      return null;
+    }
+    
+    const companyInput = companyResponse.getResponseText().trim();
+    if (companyInput) {
+      const selectedIndices = companyInput.split(',').map(s => parseInt(s.trim()) - 1);
+      selectedCompanies = selectedIndices
+        .filter(i => i >= 0 && i < companies.length)
+        .map(i => companies[i]);
+      
+      if (selectedCompanies.length === 0) {
+        ui.alert('エラー', '有効な会社が選択されませんでした。', ui.ButtonSet.OK);
+        return null;
+      }
+    }
+  }
+  
+  let selectedDepartments = [];
+  if (departments.length > 0) {
+    let deptList = '利用可能な部署名:\n';
+    departments.forEach((dept, index) => {
+      deptList += `${index + 1}. ${dept}\n`;
+    });
+    
+    const deptResponse = ui.prompt(
+      '部署名の選択',
+      deptList + '\n選択する部署の番号をカンマ区切りで入力してください。\n(例: 1,2,4)\n空欄の場合はすべての部署が対象になります。',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (deptResponse.getSelectedButton() === ui.Button.CANCEL) {
+      return null;
+    }
+    
+    const deptInput = deptResponse.getResponseText().trim();
+    if (deptInput) {
+      const selectedIndices = deptInput.split(',').map(s => parseInt(s.trim()) - 1);
+      selectedDepartments = selectedIndices
+        .filter(i => i >= 0 && i < departments.length)
+        .map(i => departments[i]);
+      
+      if (selectedDepartments.length === 0) {
+        ui.alert('エラー', '有効な部署が選択されませんでした。', ui.ButtonSet.OK);
+        return null;
+      }
+    }
+  }
+  
+  return {
+    filterType: 'filtered',
+    companies: selectedCompanies,
+    departments: selectedDepartments
+  };
+}
+
+function filterResponses(responses, filterSettings) {
+  if (filterSettings.filterType === 'all') {
+    return responses;
+  }
+  
+  return responses.filter(response => {
+    if (filterSettings.companies.length > 0) {
+      if (!filterSettings.companies.includes(response.company)) {
+        return false;
+      }
+    }
+    if (filterSettings.departments.length > 0) {
+      if (!filterSettings.departments.includes(response.department)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function loadQuestionMaster(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const questionMap = {};
+  
+  for (let i = 1; i < data.length; i++) {
+    const [id, questionText, category, reverseFlag] = data[i];
+    
+    questionMap[questionText] = {
+      id: id,
+      category: category,
+      isReverse: String(reverseFlag).toUpperCase() === 'TRUE'
+    };
+  }
+  
+  return questionMap;
+}
+
+/**
+ * 回答データを読み込み（v5.1: 列名変更対応、生年月日・役職追加）
+ */
+function loadResponseData(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const responses = [];
+  
+  // v5.1: 列名変更に対応（新旧両方をサポート）
+  const timestampCol = 0;
+  let companyCol = headers.indexOf('会社名');
+  if (companyCol === -1) companyCol = headers.indexOf('貴社名');
+  
+  const deptCol = headers.indexOf('部署名');
+  
+  let nameCol = headers.indexOf('氏名');
+  if (nameCol === -1) nameCol = headers.indexOf('お名前');
+  
+  const birthDateCol = headers.indexOf('生年月日');
+  const positionCol = headers.indexOf('役職');
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const response = {
+      timestamp: row[timestampCol],
+      company: companyCol >= 0 ? (row[companyCol] || '') : '',
+      department: deptCol >= 0 ? (row[deptCol] || '') : '',
+      name: nameCol >= 0 ? (row[nameCol] || '') : '',
+      birthDate: birthDateCol >= 0 ? (row[birthDateCol] || '') : '',
+      position: positionCol >= 0 ? (row[positionCol] || '') : '',
+      answers: {}
+    };
+    
+    // 設問の回答を格納（5列目以降、ただし非設問列は除外）
+    for (let j = 4; j < headers.length; j++) {
+      const questionText = headers[j];
+      if (questionText.includes('同意') || 
+          questionText === '生年月日' || 
+          questionText === '役職') {
+        continue;
+      }
+      const answer = row[j];
+      response.answers[questionText] = answer;
+    }
+    
+    responses.push(response);
+  }
+  
+  return responses;
+}
+
+function convertAnswerToScore(answer) {
+  if (typeof answer === 'number') {
+    if (answer >= 1 && answer <= 5) {
+      return answer;
+    }
+    return null;
+  }
+  
+  if (typeof answer === 'string') {
+    const numAnswer = parseFloat(answer);
+    if (!isNaN(numAnswer) && numAnswer >= 1 && numAnswer <= 5) {
+      return numAnswer;
+    }
+    if (SCORE_MAP[answer]) {
+      return SCORE_MAP[answer];
+    }
+  }
+  
+  return null;
+}
+
+function calculateLieScore(liReverseRaw, liNormal) {
+  if (liReverseRaw.length === 0 || liNormal.length === 0) {
+    return { score: null, biasFlag: 'データ不足' };
+  }
+  
+  const reverseAvg = liReverseRaw.reduce((a, b) => a + b, 0) / liReverseRaw.length;
+  const normalAvg = liNormal.reduce((a, b) => a + b, 0) / liNormal.length;
+  
+  let biasFlag, reliabilityScore;
+  if (reverseAvg >= 4.0) {
+    biasFlag = '⚠️警告';
+    reliabilityScore = normalAvg * 0.5;
+  } else if (reverseAvg >= 3.5) {
+    biasFlag = '△注意';
+    reliabilityScore = normalAvg * 0.8;
+  } else {
+    biasFlag = '✅正常';
+    reliabilityScore = normalAvg;
+  }
+  
+  return {
+    score: Math.round(reliabilityScore * 100) / 100,
+    biasFlag: biasFlag
+  };
+}
+
+function calculateScores(responses, questionMap) {
+  const results = [];
+  
+  for (const response of responses) {
+    const result = {
+      name: response.name,
+      company: response.company,
+      department: response.department,
+      birthDate: response.birthDate,
+      position: response.position,
+      scores: {},
+      biasFlag: ''
+    };
+    
+    for (const categoryCode in CATEGORY_NAMES) {
+      result.scores[categoryCode] = [];
+    }
+    
+    const liReverseRaw = [];
+    const liNormal = [];
+    
+    for (const questionText in response.answers) {
+      const answer = response.answers[questionText];
+      const questionInfo = questionMap[questionText];
+      
+      if (!questionInfo) continue;
+      
+      let score = convertAnswerToScore(answer);
+      if (score === null) continue;
+      
+      const category = questionInfo.category;
+      
+      if (category === 'LI') {
+        if (questionInfo.isReverse) {
+          liReverseRaw.push(score);
+        } else {
+          liNormal.push(score);
+        }
+        continue;
+      }
+      
+      if (questionInfo.isReverse) {
+        score = 6 - score;
+      }
+      
+      if (result.scores[category]) {
+        result.scores[category].push(score);
+      }
+    }
+    
+    const lieResult = calculateLieScore(liReverseRaw, liNormal);
+    result.scores['LI'] = lieResult.score;
+    result.biasFlag = lieResult.biasFlag;
+    
+    for (const categoryCode in result.scores) {
+      if (categoryCode === 'LI') continue;
+      
+      const scores = result.scores[categoryCode];
+      if (scores.length > 0) {
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        result.scores[categoryCode] = Math.round(avg * 100) / 100;
+      } else {
+        result.scores[categoryCode] = null;
+      }
+    }
+    
+    results.push(result);
+  }
+  
+  return results;
+}
+
+
+function outputResults(ss, results) {
+  let resultSheet = ss.getSheetByName('集計結果');
+  if (resultSheet) ss.deleteSheet(resultSheet);
+  
+  resultSheet = ss.insertSheet('集計結果');
+  
+  const headers = ['氏名', '会社名', '部署名', '生年月日', '役職'];
+  for (const categoryCode in CATEGORY_NAMES) {
+    headers.push(`${CATEGORY_NAMES[categoryCode]}(${categoryCode})`);
+  }
+  headers.push('回答信頼性チェック');
+  
+  const outputData = [headers];
+  for (const result of results) {
+    const row = [result.name, result.company, result.department, result.birthDate, result.position];
+    for (const categoryCode in CATEGORY_NAMES) {
+      row.push(result.scores[categoryCode]);
+    }
+    row.push(result.biasFlag);
+    outputData.push(row);
+  }
+  
+  resultSheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
+  
+  resultSheet.getRange(1, 1, 1, headers.length)
+    .setBackground('#366092')
+    .setFontColor('#FFFFFF')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+  
+  for (let i = 1; i <= headers.length; i++) {
+    resultSheet.autoResizeColumn(i);
+  }
+  
+  resultSheet.setFrozenRows(1);
+  resultSheet.setFrozenColumns(5);
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(dir /s \"c:\\\\Users\\\\daito\\\\Documents\\\\O2CONNECTIVE ver.2\")",
+      "Bash(dir:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma init:*)",
+      "Bash(git init:*)"
+    ]
+  }
+}
