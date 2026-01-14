@@ -7,7 +7,13 @@
       "Bash(npx create-next-app:*)",
       "Bash(npm install:*)",
       "Bash(npx prisma init:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: O2CONNECTIVE適性診断サービス\n\n- Next.js 14+ App Router + TypeScript基盤\n- 性格診断モジュール（120問、Big Five + Dark Triad）\n- ICAR-16認知能力テスト（4種類×4問）\n- スコア正規化パイプライン（T-score、パーセンタイル）\n- AI連携サービス（バイアス軽減プロンプト）\n- Prisma + PostgreSQLスキーマ\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(gh repo create:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAI連携をGemini 3 Flash \\(preview\\)に変更\n\n- @anthropic-ai/sdk → @google/genai に変更\n- モデル: gemini-3-flash-preview\n- 環境変数: ANTHROPIC_API_KEY → GEMINI_API_KEY\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

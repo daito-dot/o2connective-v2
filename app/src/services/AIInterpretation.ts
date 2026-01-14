@@ -1,9 +1,10 @@
 /**
  * AI解釈サービス
  * バイアス軽減プロンプト生成と結果解釈
+ * Google Gemini 3 Flash使用
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import type {
   PersonalityDomain,
   BigFiveDomain,
@@ -154,13 +155,14 @@ const TRAIT_STRENGTHS: Record<PersonalityDomain, Record<TendencyLevel, string[]>
 // =============================================================================
 
 export class AIInterpretationService {
-  private client: Anthropic | null = null;
+  private client: GoogleGenAI | null = null;
+  private modelId = 'gemini-3-flash-preview';
 
   constructor() {
     // APIキーが設定されている場合のみクライアントを初期化
-    if (process.env.ANTHROPIC_API_KEY) {
-      this.client = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
+    if (process.env.GEMINI_API_KEY) {
+      this.client = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
       });
     }
   }
@@ -394,7 +396,7 @@ ${JSON.stringify(payload, null, 2)}
   // ---------------------------------------------------------------------------
 
   /**
-   * Claude APIを呼び出して解釈を取得
+   * Gemini APIを呼び出して解釈を取得
    */
   async interpret(
     domainScores: DomainScore[],
@@ -404,7 +406,7 @@ ${JSON.stringify(payload, null, 2)}
   ): Promise<AIInterpretationOutput> {
     // APIキーがない場合はデフォルト出力を返す
     if (!this.client) {
-      console.warn('Anthropic API key not configured. Returning default interpretation.');
+      console.warn('Gemini API key not configured. Returning default interpretation.');
       return this.getDefaultInterpretation(domainScores, reliabilityMetrics);
     }
 
@@ -412,25 +414,19 @@ ${JSON.stringify(payload, null, 2)}
     const prompt = this.generatePrompt(payload);
 
     try {
-      const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+      const response = await this.client.models.generateContent({
+        model: this.modelId,
+        contents: prompt,
       });
 
-      // レスポンスからJSONを抽出
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type');
+      // レスポンスからテキストを取得
+      const text = response.text;
+      if (!text) {
+        throw new Error('Empty response from Gemini');
       }
 
       // JSON部分を抽出してパース
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
