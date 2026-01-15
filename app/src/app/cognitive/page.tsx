@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { COGNITIVE_TEST_ITEMS } from '@/data/cognitiveTests';
+import { ICAR_16_ITEMS, TEST_TYPE_DESCRIPTIONS } from '@/data/cognitiveTests';
 import { CognitiveScoring } from '@/services/CognitiveScoring';
 import { CognitiveTestCard } from '@/components/cognitive/CognitiveTestCard';
 import { CognitiveResultDisplay } from '@/components/cognitive/CognitiveResultDisplay';
@@ -24,7 +24,7 @@ export default function CognitiveTestPage() {
   // シャッフルしたテスト項目（初期化時に一度だけ）
   const [testItems] = useState(() => {
     // テストタイプをランダムに混ぜる
-    const shuffled = [...COGNITIVE_TEST_ITEMS].sort(() => Math.random() - 0.5);
+    const shuffled = [...ICAR_16_ITEMS].sort(() => Math.random() - 0.5);
     return shuffled;
   });
 

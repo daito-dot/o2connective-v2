@@ -14,7 +14,8 @@
       "Bash(timeout:*)",
       "Bash(npm uninstall:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAI連携をGemini 3 Flash \\(preview\\)に変更\n\n- @anthropic-ai/sdk → @google/genai に変更\n- モデル: gemini-3-flash-preview\n- 環境変数: ANTHROPIC_API_KEY → GEMINI_API_KEY\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nスコア算出ドキュメント追加 & AIエラー処理改善\n\n- docs/SCORING_METHODOLOGY.md: スコア算出方法論の詳細ドキュメント\n- AIInterpretationError クラス追加でエラーハンドリング明確化\n- フォールバック動作を廃止し、エラー時は明示的にエラー表示\n- ResultDisplay: エラー状態の視覚的表示（設定方法ガイド付き）\n- APIルート: エラーコードとメッセージを返すように改善\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nスコア算出ドキュメント追加 & AIエラー処理改善\n\n- docs/SCORING_METHODOLOGY.md: スコア算出方法論の詳細ドキュメント\n- AIInterpretationError クラス追加でエラーハンドリング明確化\n- フォールバック動作を廃止し、エラー時は明示的にエラー表示\n- ResultDisplay: エラー状態の視覚的表示（設定方法ガイド付き）\n- APIルート: エラーコードとメッセージを返すように改善\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: COGNITIVE_TEST_ITEMS → ICAR_16_ITEMS に修正\n\n認知テストページでのインポート名を正しいエクスポート名に修正\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
