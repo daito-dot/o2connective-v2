@@ -20,6 +20,11 @@ import type {
 
 type AssessmentPhase = 'intro' | 'questions' | 'calculating' | 'results';
 
+interface AIError {
+  code: string;
+  message: string;
+}
+
 export default function AssessmentPage() {
   const [phase, setPhase] = useState<AssessmentPhase>('intro');
   const [answers, setAnswers] = useState<Map<string, PersonalityAnswer>>(new Map());
@@ -27,6 +32,7 @@ export default function AssessmentPage() {
   const [domainScores, setDomainScores] = useState<DomainScore[]>([]);
   const [reliabilityMetrics, setReliabilityMetrics] = useState<ReliabilityMetrics | null>(null);
   const [aiInterpretation, setAiInterpretation] = useState<AIInterpretationOutput | undefined>();
+  const [aiError, setAiError] = useState<AIError | null>(null);
 
   // 設問をシャッフル（回答バイアス軽減）
   const shuffledQuestions = useMemo(() => shuffleQuestions(PERSONALITY_QUESTIONS), []);
@@ -77,6 +83,7 @@ export default function AssessmentPage() {
   // 結果を計算
   const handleComplete = useCallback(async () => {
     setPhase('calculating');
+    setAiError(null);
 
     // 回答をリストに変換
     const answerList = Array.from(answers.values());
@@ -103,9 +110,20 @@ export default function AssessmentPage() {
       if (response.ok) {
         const interpretation = await response.json();
         setAiInterpretation(interpretation);
+      } else {
+        // エラーレスポンスを取得
+        const errorData = await response.json();
+        setAiError({
+          code: errorData.code || 'UNKNOWN_ERROR',
+          message: errorData.error || 'AI分析に失敗しました',
+        });
       }
     } catch (error) {
       console.error('AI interpretation failed:', error);
+      setAiError({
+        code: 'NETWORK_ERROR',
+        message: 'ネットワークエラーが発生しました。インターネット接続を確認してください。',
+      });
     }
 
     setPhase('results');
@@ -219,6 +237,7 @@ export default function AssessmentPage() {
             domainScores={domainScores}
             reliabilityMetrics={reliabilityMetrics}
             aiInterpretation={aiInterpretation}
+            aiError={aiError}
           />
 
           {/* 再診断ボタン */}
@@ -231,6 +250,7 @@ export default function AssessmentPage() {
                 setDomainScores([]);
                 setReliabilityMetrics(null);
                 setAiInterpretation(undefined);
+                setAiError(null);
               }}
               className="px-6 py-3 border-2 border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-100 transition-colors"
             >

@@ -5,6 +5,26 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
+
+// =============================================================================
+// エラークラス
+// =============================================================================
+
+export type AIErrorCode =
+  | 'API_KEY_NOT_CONFIGURED'
+  | 'EMPTY_RESPONSE'
+  | 'INVALID_RESPONSE_FORMAT'
+  | 'API_CALL_FAILED';
+
+export class AIInterpretationError extends Error {
+  constructor(
+    public readonly code: AIErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = 'AIInterpretationError';
+  }
+}
 import type {
   PersonalityDomain,
   BigFiveDomain,
@@ -397,6 +417,7 @@ ${JSON.stringify(payload, null, 2)}
 
   /**
    * Gemini APIを呼び出して解釈を取得
+   * @throws {AIInterpretationError} APIキーが未設定またはAPI呼び出しに失敗した場合
    */
   async interpret(
     domainScores: DomainScore[],
@@ -404,10 +425,12 @@ ${JSON.stringify(payload, null, 2)}
     purpose: AnalysisPurpose,
     cognitiveResult?: CognitiveResult
   ): Promise<AIInterpretationOutput> {
-    // APIキーがない場合はデフォルト出力を返す
+    // APIキーがない場合はエラーをスロー
     if (!this.client) {
-      console.warn('Gemini API key not configured. Returning default interpretation.');
-      return this.getDefaultInterpretation(domainScores, reliabilityMetrics);
+      throw new AIInterpretationError(
+        'API_KEY_NOT_CONFIGURED',
+        'Gemini APIキーが設定されていません。環境変数 GEMINI_API_KEY を設定してください。'
+      );
     }
 
     const payload = this.generatePayload(domainScores, reliabilityMetrics, purpose, cognitiveResult);
@@ -422,19 +445,33 @@ ${JSON.stringify(payload, null, 2)}
       // レスポンスからテキストを取得
       const text = response.text;
       if (!text) {
-        throw new Error('Empty response from Gemini');
+        throw new AIInterpretationError(
+          'EMPTY_RESPONSE',
+          'AIからの応答が空でした。しばらく時間をおいて再度お試しください。'
+        );
       }
 
       // JSON部分を抽出してパース
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+        throw new AIInterpretationError(
+          'INVALID_RESPONSE_FORMAT',
+          'AIからの応答を解析できませんでした。'
+        );
       }
 
       return JSON.parse(jsonMatch[0]) as AIInterpretationOutput;
     } catch (error) {
+      // 既にAIInterpretationErrorの場合はそのまま再スロー
+      if (error instanceof AIInterpretationError) {
+        throw error;
+      }
+      // その他のエラーはラップしてスロー
       console.error('AI interpretation error:', error);
-      return this.getDefaultInterpretation(domainScores, reliabilityMetrics);
+      throw new AIInterpretationError(
+        'API_CALL_FAILED',
+        `AI解釈の取得に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`
+      );
     }
   }
 

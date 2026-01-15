@@ -14,10 +14,16 @@ import type {
 } from '@/types/assessment';
 import { DOMAIN_NAMES } from '@/types/assessment';
 
+interface AIError {
+  code: string;
+  message: string;
+}
+
 interface ResultDisplayProps {
   domainScores: DomainScore[];
   reliabilityMetrics: ReliabilityMetrics;
   aiInterpretation?: AIInterpretationOutput;
+  aiError?: AIError | null;
 }
 
 // 傾向レベルの色マッピング
@@ -45,10 +51,39 @@ const DOMAIN_GROUPS = {
   additional: ['EM', 'WR'] as PersonalityDomain[],
 };
 
+// エラーコードに応じたメッセージとアイコン
+const ERROR_DISPLAY: Record<string, { title: string; icon: string }> = {
+  API_KEY_NOT_CONFIGURED: {
+    title: 'APIキー未設定',
+    icon: '🔑',
+  },
+  EMPTY_RESPONSE: {
+    title: 'AI応答なし',
+    icon: '📭',
+  },
+  INVALID_RESPONSE_FORMAT: {
+    title: '応答解析エラー',
+    icon: '⚠️',
+  },
+  API_CALL_FAILED: {
+    title: 'API呼び出しエラー',
+    icon: '❌',
+  },
+  NETWORK_ERROR: {
+    title: 'ネットワークエラー',
+    icon: '🌐',
+  },
+  UNKNOWN_ERROR: {
+    title: '不明なエラー',
+    icon: '❓',
+  },
+};
+
 export function ResultDisplay({
   domainScores,
   reliabilityMetrics,
   aiInterpretation,
+  aiError,
 }: ResultDisplayProps) {
   const scoreMap = new Map(domainScores.map(ds => [ds.domain, ds]));
 
@@ -133,8 +168,53 @@ export function ResultDisplay({
         </div>
       </section>
 
-      {/* AI解釈セクション */}
-      {aiInterpretation && (
+      {/* AI解釈セクション - エラー表示 */}
+      {aiError && (
+        <section className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <h2 className="text-2xl font-bold text-red-800 mb-4 flex items-center gap-2">
+            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            AI分析エラー
+          </h2>
+
+          <div className="bg-white rounded-lg p-6 border border-red-100">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl">
+                {ERROR_DISPLAY[aiError.code]?.icon || ERROR_DISPLAY.UNKNOWN_ERROR.icon}
+              </span>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-700 mb-2">
+                  {ERROR_DISPLAY[aiError.code]?.title || ERROR_DISPLAY.UNKNOWN_ERROR.title}
+                </h3>
+                <p className="text-red-600 mb-4">{aiError.message}</p>
+
+                {aiError.code === 'API_KEY_NOT_CONFIGURED' && (
+                  <div className="bg-red-50 rounded-lg p-4 text-sm">
+                    <p className="font-medium text-red-700 mb-2">設定方法:</p>
+                    <ol className="list-decimal list-inside text-red-600 space-y-1">
+                      <li><a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-red-800">Google AI Studio</a> でAPIキーを取得</li>
+                      <li><code className="bg-red-100 px-1 rounded">.env</code> ファイルに <code className="bg-red-100 px-1 rounded">GEMINI_API_KEY=your_key</code> を追加</li>
+                      <li>サーバーを再起動</li>
+                    </ol>
+                  </div>
+                )}
+
+                <p className="text-gray-500 text-xs mt-4">
+                  エラーコード: {aiError.code}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-red-600 text-sm mt-4">
+            ※ スコア分析は正常に完了しています。AI分析のみ利用できません。
+          </p>
+        </section>
+      )}
+
+      {/* AI解釈セクション - 成功時 */}
+      {aiInterpretation && !aiError && (
         <section className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
             <svg className="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -237,6 +317,19 @@ export function ResultDisplay({
               </span>
             </p>
           </div>
+        </section>
+      )}
+
+      {/* AI分析なしの場合（エラーも成功もない場合） */}
+      {!aiInterpretation && !aiError && (
+        <section className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+          <h2 className="text-2xl font-bold text-gray-600 mb-4 flex items-center gap-2">
+            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            AI分析
+          </h2>
+          <p className="text-gray-500">AI分析は利用できませんでした。</p>
         </section>
       )}
     </div>

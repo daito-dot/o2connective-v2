@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { aiInterpretationService } from '@/services/AIInterpretation';
+import { aiInterpretationService, AIInterpretationError } from '@/services/AIInterpretation';
 import type { DomainScore, ReliabilityMetrics, AnalysisPurpose } from '@/types/assessment';
 
 interface InterpretRequest {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // バリデーション
     if (!domainScores || !reliabilityMetrics || !purpose) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields', code: 'VALIDATION_ERROR' },
         { status: 400 }
       );
     }
@@ -36,8 +36,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(interpretation);
   } catch (error) {
     console.error('Interpretation API error:', error);
+
+    // AIInterpretationErrorの場合は詳細なエラー情報を返す
+    if (error instanceof AIInterpretationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.code === 'API_KEY_NOT_CONFIGURED' ? 503 : 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }
