@@ -5,12 +5,13 @@
  * jsPsychパラダイムベースの認知機能テストバッテリー
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { NBackTest } from '@/components/cognitive/NBackTest';
 import { StroopTest } from '@/components/cognitive/StroopTest';
 import { SimpleRTTest } from '@/components/cognitive/SimpleRTTest';
 import { cognitiveScoring } from '@/services/CognitiveScoring';
+import { saveCognitiveResult, type StoredCognitiveResult } from '@/lib/cognitiveStorage';
 import type { CognitiveAnswer, CognitiveTestType, CognitiveResult } from '@/types/assessment';
 
 type TestPhase = 'intro' | 'nback' | 'stroop' | 'simple_rt' | 'calculating' | 'results';
@@ -48,6 +49,18 @@ export default function CognitiveTestPage() {
   });
   const [result, setResult] = useState<CognitiveResult | null>(null);
   const [testStartTime, setTestStartTime] = useState<number>(0);
+  const [userName, setUserName] = useState<string>('');
+  const [savedResult, setSavedResult] = useState<StoredCognitiveResult | null>(null);
+
+  // 前回のユーザー名を復元
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const lastUserName = localStorage.getItem('o2connective_last_username');
+      if (lastUserName) {
+        setUserName(lastUserName);
+      }
+    }
+  }, []);
 
   // N-back完了
   const handleNBackComplete = useCallback((answers: CognitiveAnswer[]) => {
@@ -77,6 +90,10 @@ export default function CognitiveTestPage() {
       // スコアリングサービスで結果を計算
       const cognitiveResult = cognitiveScoring.calculateResult(answers, totalTime);
 
+      // 結果を保存
+      const stored = saveCognitiveResult(userName, cognitiveResult);
+      setSavedResult(stored);
+
       setResult(cognitiveResult);
       setPhase('results');
     }, 1500);
@@ -84,6 +101,12 @@ export default function CognitiveTestPage() {
 
   // テスト開始
   const startTest = () => {
+    if (!userName.trim()) {
+      alert('お名前を入力してください');
+      return;
+    }
+    // ユーザー名を保存
+    localStorage.setItem('o2connective_last_username', userName.trim());
     setTestStartTime(performance.now());
     setPhase('nback');
   };
@@ -144,9 +167,25 @@ export default function CognitiveTestPage() {
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
               <h3 className="font-semibold text-amber-800 mb-2">所要時間</h3>
               <p className="text-sm text-amber-700">約10〜15分</p>
+            </div>
+
+            {/* ユーザー名入力 */}
+            <div className="mb-8">
+              <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-2">
+                お名前（結果の保存に使用します）
+              </label>
+              <input
+                type="text"
+                id="userName"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="例: 山田太郎"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                maxLength={50}
+              />
             </div>
 
             <div className="flex justify-center gap-4">
@@ -157,8 +196,14 @@ export default function CognitiveTestPage() {
                 戻る
               </Link>
               <button
+                type="button"
                 onClick={startTest}
-                className="px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors shadow-lg"
+                disabled={!userName.trim()}
+                className={`px-8 py-3 rounded-lg font-semibold transition-colors shadow-lg ${
+                  userName.trim()
+                    ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
                 テストを開始する
               </button>
@@ -257,9 +302,19 @@ export default function CognitiveTestPage() {
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 py-12 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-xl shadow-lg p-8">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2 text-center">
               認知機能テスト結果
             </h1>
+
+            {/* ユーザー名と保存確認 */}
+            {savedResult && (
+              <div className="text-center mb-6">
+                <p className="text-gray-600">{savedResult.userName} さんの結果</p>
+                <p className="text-xs text-green-600 mt-1">
+                  結果を保存しました（{new Date(savedResult.completedAt).toLocaleString('ja-JP')}）
+                </p>
+              </div>
+            )}
 
             {/* 総合スコア */}
             <div className="bg-indigo-50 rounded-lg p-6 mb-8 text-center">
@@ -337,12 +392,18 @@ export default function CognitiveTestPage() {
             </div>
 
             {/* ナビゲーション */}
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/"
                 className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
               >
                 ホームに戻る
+              </Link>
+              <Link
+                href="/cognitive/history"
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                結果履歴を見る
               </Link>
               <Link
                 href="/assessment"
