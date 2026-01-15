@@ -171,32 +171,78 @@ export interface ReliabilityMetrics {
 }
 
 // =============================================================================
-// 認知能力テスト関連の型
+// 認知能力テスト関連の型（jsPsychパラダイムベース）
 // =============================================================================
 
-/** 認知テストタイプ */
+/** 認知テストタイプ（確立された心理学パラダイム） */
 export type CognitiveTestType =
-  | 'matrix_reasoning'      // 行列推理
-  | 'letter_number_series'  // 文字数列
-  | 'verbal_reasoning'      // 言語推理
-  | '3d_rotation';          // 3D回転
+  | 'n_back'              // N-back: ワーキングメモリ
+  | 'stroop'              // Stroop: 抑制制御・注意
+  | 'simple_rt';          // 単純反応時間: 処理速度
 
-/** 認知テストアイテム */
-export interface CognitiveTestItem {
-  id: string;
+/** 認知テスト測定領域 */
+export type CognitiveDomain =
+  | 'working_memory'      // ワーキングメモリ
+  | 'inhibition'          // 抑制制御
+  | 'processing_speed';   // 処理速度
+
+/** 認知テストタイプと領域のマッピング */
+export const COGNITIVE_DOMAIN_MAP: Record<CognitiveTestType, CognitiveDomain> = {
+  n_back: 'working_memory',
+  stroop: 'inhibition',
+  simple_rt: 'processing_speed',
+};
+
+/** 認知テストタイプ名称 */
+export const COGNITIVE_TEST_NAMES: Record<CognitiveTestType, string> = {
+  n_back: 'N-back課題',
+  stroop: 'ストループ課題',
+  simple_rt: '反応時間課題',
+};
+
+/** 認知領域名称 */
+export const COGNITIVE_DOMAIN_NAMES: Record<CognitiveDomain, string> = {
+  working_memory: 'ワーキングメモリ',
+  inhibition: '抑制制御',
+  processing_speed: '処理速度',
+};
+
+/** N-back試行 */
+export interface NBackTrial {
+  stimulus: string;       // 表示する文字/数字
+  isTarget: boolean;      // N個前と一致するか
+  position: number;       // 試行番号
+}
+
+/** Stroop試行 */
+export interface StroopTrial {
+  word: string;           // 表示する単語（色名）
+  color: string;          // 文字の色（CSS color）
+  isCongruent: boolean;   // 一致条件か不一致条件か
+  correctResponse: string; // 正答キー
+}
+
+/** 単純反応時間試行 */
+export interface SimpleRTTrial {
+  delay: number;          // 刺激表示までの遅延（ms）
+  stimulusType: 'visual' | 'auditory';
+}
+
+/** 認知テスト設定 */
+export interface CognitiveTestConfig {
   type: CognitiveTestType;
-  stimulus: string | object;  // 問題の刺激（画像URL or データ）
-  options: string[];          // 選択肢
-  correctAnswer: string;
-  difficulty?: number;        // IRT難易度パラメータ
-  timeLimit: number;          // 秒
+  nBackLevel?: number;    // N-back用: 1, 2, or 3
+  trialCount: number;     // 試行数
+  practiceTrials: number; // 練習試行数
+  stimulusDuration?: number; // 刺激表示時間（ms）
+  isiDuration?: number;   // 刺激間隔（ms）
 }
 
 /** 認知テスト回答 */
 export interface CognitiveAnswer {
-  itemId: string;
-  itemType: CognitiveTestType;
-  selectedAnswer: string | null;
+  testType: CognitiveTestType;
+  trialIndex: number;
+  response: string | null;  // キー押下 or null（無反応）
   isCorrect: boolean;
   responseTimeMs: number;
   timestamp: Date;
@@ -210,29 +256,50 @@ export type CognitiveLevel =
   | 'above_average'                // 115-130
   | 'significantly_above_average'; // >130
 
+/** ドメイン別スコア */
+export interface CognitiveDomainScore {
+  domain: CognitiveDomain;
+  accuracy: number;           // 正答率 (0-1)
+  meanRT: number;             // 平均反応時間（ms）
+  sdRT: number;               // 反応時間SD
+  efficiency: number;         // 効率性 = 正答率 / log(RT)
+  percentile: number;         // パーセンタイル
+  level: CognitiveLevel;
+}
+
 /** 認知テスト結果 */
 export interface CognitiveResult {
-  /** 生スコア */
-  rawScores: {
-    matrixReasoning: number;
-    letterNumberSeries: number;
-    verbalReasoning: number;
-    rotation3d: number;
-    total: number;
+  /** ドメイン別スコア */
+  domainScores: Record<CognitiveDomain, CognitiveDomainScore>;
+
+  /** 総合スコア */
+  overallScore: {
+    compositePercentile: number;  // 総合パーセンタイル
+    standardScore: number;        // 標準スコア（平均100, SD15）
+    level: CognitiveLevel;
   };
 
-  /** 正規化スコア */
-  normalizedScores: {
-    percentileRank: number;     // 0-100
-    standardScore: number;      // IQ様式（平均100, SD15）
-    relativePosition: CognitiveLevel;
-  };
+  /** テスト詳細データ */
+  testDetails: {
+    type: CognitiveTestType;
+    totalTrials: number;
+    correctTrials: number;
+    accuracy: number;
+    meanRT: number;
+    sdRT: number;
+  }[];
 
   /** 時間データ */
   timingData: {
     totalTime: number;
-    averageTimePerItem: number;
-    timeByType: Record<CognitiveTestType, number>;
+    timeByTest: Record<CognitiveTestType, number>;
+  };
+
+  /** 信頼性 */
+  reliability: {
+    validTrials: number;      // 有効試行数
+    invalidTrials: number;    // 無効試行数（早すぎる/遅すぎる反応）
+    isReliable: boolean;
   };
 }
 
@@ -271,8 +338,11 @@ export interface AIInputPayload {
   cognitiveProfile?: {
     overallLevel: CognitiveLevel;
     description: string;
-    strengthAreas: CognitiveTestType[];
-    developmentAreas: CognitiveTestType[];
+    domainProfiles: {
+      domain: CognitiveDomain;
+      level: CognitiveLevel;
+      description: string;
+    }[];
   };
 
   /** 信頼性注記 */
