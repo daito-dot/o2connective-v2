@@ -223,10 +223,9 @@ export class AIInterpretationService {
     let cognitiveProfile: AIInputPayload['cognitiveProfile'];
     if (cognitiveResult) {
       cognitiveProfile = {
-        overallLevel: cognitiveResult.normalizedScores.relativePosition,
-        description: this.getCognitiveLevelDescription(cognitiveResult.normalizedScores.relativePosition),
-        strengthAreas: this.identifyStrengthAreas(cognitiveResult),
-        developmentAreas: this.identifyDevelopmentAreas(cognitiveResult),
+        overallLevel: cognitiveResult.overallScore.level,
+        description: this.getCognitiveLevelDescription(cognitiveResult.overallScore.level),
+        domainProfiles: this.createDomainProfiles(cognitiveResult),
       };
     }
 
@@ -298,23 +297,49 @@ export class AIInterpretationService {
   }
 
   /**
-   * 認知能力の強み領域を特定
+   * 認知ドメインプロファイルを生成
    */
-  private identifyStrengthAreas(result: CognitiveResult): CognitiveLevel[] {
-    const scores = result.rawScores;
-    const avg = scores.total / 4;
-    const strengths: CognitiveLevel[] = [];
-
-    // 平均以上の領域を特定
-    // （簡易実装：実際にはより詳細な分析が必要）
-    return strengths;
+  private createDomainProfiles(result: CognitiveResult): {
+    domain: 'working_memory' | 'inhibition' | 'processing_speed';
+    level: CognitiveLevel;
+    description: string;
+  }[] {
+    return Object.entries(result.domainScores).map(([domain, score]) => ({
+      domain: domain as 'working_memory' | 'inhibition' | 'processing_speed',
+      level: score.level,
+      description: this.getDomainDescription(domain, score.level),
+    }));
   }
 
   /**
-   * 認知能力の発展領域を特定
+   * ドメイン別の説明を取得
    */
-  private identifyDevelopmentAreas(result: CognitiveResult): CognitiveLevel[] {
-    return [];
+  private getDomainDescription(domain: string, level: CognitiveLevel): string {
+    const descriptions: Record<string, Record<CognitiveLevel, string>> = {
+      working_memory: {
+        significantly_above_average: '複数の情報を同時に保持・操作する能力が非常に高い',
+        above_average: '情報の一時的な保持と操作が得意',
+        average: '一般的なワーキングメモリ容量',
+        below_average: '情報を段階的に処理することが効果的',
+        significantly_below_average: '外部記憶ツールの活用が推奨される',
+      },
+      inhibition: {
+        significantly_above_average: '不要な反応の抑制と注意コントロールが非常に優れている',
+        above_average: '干渉に強く集中力を維持できる',
+        average: '一般的な抑制制御能力',
+        below_average: '刺激の少ない環境が効果的',
+        significantly_below_average: '構造化された環境での作業が推奨される',
+      },
+      processing_speed: {
+        significantly_above_average: '情報処理が非常に速い',
+        above_average: '平均以上の速度で情報を処理できる',
+        average: '一般的な処理速度',
+        below_average: '十分な時間をかけることで正確な処理が可能',
+        significantly_below_average: '時間に余裕を持ったスケジューリングが効果的',
+      },
+    };
+
+    return descriptions[domain]?.[level] ?? '一般的な水準';
   }
 
   // ---------------------------------------------------------------------------
